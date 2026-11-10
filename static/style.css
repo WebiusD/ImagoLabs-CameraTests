@@ -64,12 +64,15 @@ main {
   grid-template-columns: 1.4fr 1fr;
   grid-template-areas:
     "stream control"
+    "usb control"
     "log log";
+  align-items: start;
   gap: 1rem;
   padding: 1rem 1.5rem 2rem;
 }
 
 .stream-panel { grid-area: stream; }
+.usb-panel { grid-area: usb; }
 .control-panel { grid-area: control; }
 .log-panel { grid-area: log; }
 
@@ -187,6 +190,34 @@ button:disabled {
 
 .overlay.hidden { display: none; }
 
+.maximize {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: flex;
+  padding: 0.35rem;
+  background: rgba(0, 0, 0, 0.55);
+  border-color: transparent;
+  opacity: 0.7;
+}
+
+.maximize:hover { opacity: 1; }
+
+.maximize svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.stream-wrap:fullscreen {
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -291,6 +322,7 @@ button:disabled {
     grid-template-columns: 1fr;
     grid-template-areas:
       "stream"
+      "usb"
       "control"
       "log";
   }

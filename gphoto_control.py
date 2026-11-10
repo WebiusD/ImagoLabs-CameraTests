@@ -37,6 +37,7 @@ class GphotoControl:
         self.connected_at: Optional[float] = None
         self.capabilities: dict[str, Any] = {}
         self.last_capture: Optional[dict] = None
+        self.is_canon_eos = False
 
     # ------------------------------------------------------------------
     # USB claim helpers
@@ -101,6 +102,7 @@ class GphotoControl:
             self.last_error = None
             self.model = self._read_model()
             self.capabilities = self.probe_capabilities()
+            self.is_canon_eos = "eosremoterelease" in self._list_config_names()
             log.info("gphoto2 connected: %s", self.model)
             return self.status()
 
@@ -111,10 +113,16 @@ class GphotoControl:
                 self.camera = None
             self.connected = False
             self.model = None
+            self.is_canon_eos = False
             self.capabilities = {}
             self.connected_at = None
             log.info("gphoto2 disconnected")
             return self.status()
+
+    def reconnect(self) -> dict:
+        with self._cam_lock:
+            self.disconnect()
+            return self.connect()
 
     def _read_model(self) -> str:
         try:
@@ -289,15 +297,11 @@ class GphotoControl:
             if self.camera is None:
                 raise RuntimeError("Camera not connected")
 
-            # End live view if the camera exposes it — needed for many Nikons
-            # before a still can fire (and flash) over USB.
-            try:
-                vf = self.camera.get_single_config("viewfinder")
-                if vf.get_value() in (1, "1", True):
-                    vf.set_value(0)
-                    self.camera.set_single_config("viewfinder", vf)
-            except gp.GPhoto2Error:
-                pass
+            # Needed for many Nikons before a still can fire (and flash) over USB.
+            # Canon EOS shoots fine during live view, and toggling the viewfinder
+            # there sets the EVF output to "Off", which also kills HDMI.
+            if not self.is_canon_eos:
+                self.end_remote_liveview()
 
             if self._in_movie_mode():
                 self.last_error = "Camera is in movie mode — switch the dial to a photo mode"
@@ -339,6 +343,33 @@ class GphotoControl:
             self.last_error = None
             log.info("Captured %s in %ss", target.name, result["elapsed_s"])
             return result
+
+    def set_evf_output(self, value: str) -> bool:
+        """Route Canon EOS live view (``output``: "TFT", "PC", "TFT + PC", ...)."""
+        with self._cam_lock:
+            if self.camera is None:
+                return False
+            try:
+                widget = self.camera.get_single_config("output")
+                widget.set_value(value)
+                self.camera.set_single_config("output", widget)
+                return True
+            except gp.GPhoto2Error as exc:
+                log.warning("Could not set output=%s: %s", value, exc)
+                return False
+
+    def end_remote_liveview(self) -> None:
+        """Turn off USB live view if the camera exposes the ``viewfinder`` toggle."""
+        with self._cam_lock:
+            if self.camera is None:
+                return
+            try:
+                vf = self.camera.get_single_config("viewfinder")
+                if vf.get_value() in (1, "1", True):
+                    vf.set_value(0)
+                    self.camera.set_single_config("viewfinder", vf)
+            except gp.GPhoto2Error:
+                pass
 
     def _in_movie_mode(self) -> bool:
         # Canon EOS ignores still releases while the body is in a movie mode.

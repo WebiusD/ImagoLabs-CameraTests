@@ -5,6 +5,9 @@ const $ = (sel) => document.querySelector(sel);
 const simBadge = $("#sim-badge");
 const streamOverlay = $("#stream-overlay");
 const hdmiStats = $("#hdmi-stats");
+const usbOverlay = $("#usb-overlay");
+const usbStats = $("#usb-stats");
+const usbStream = $("#usb-stream");
 const camStats = $("#cam-stats");
 const deviceSelect = $("#device-select");
 const exposureControls = $("#exposure-controls");
@@ -82,10 +85,41 @@ function updateHdmi(hdmi) {
   renderDl(hdmiStats, [
     ["State", `<span class="dot ${aliveClass}"></span>${hdmi.state}`],
     ["Device", String(hdmi.device)],
-    ["Resolution", hdmi.width && hdmi.height ? `${hdmi.width}×${hdmi.height}` : "—"],
+    ["Input", hdmi.width && hdmi.height ? `${hdmi.width}×${hdmi.height} @ ${hdmi.requested_fps} fps requested` : "—"],
+    ["Picture aspect", hdmi.content_aspect ? hdmi.content_aspect.toFixed(2) : "—"],
+    ["Preview", fmtSize(hdmi.output_width, hdmi.output_height)],
+    ["FPS", hdmi.fps.toFixed(1)],
     ["Frames", String(hdmi.frames_received)],
     ["Last frame", fmtAge(hdmi.last_frame_age_s)],
     ["Error", hdmi.error || "—"],
+  ]);
+}
+
+function fmtSize(w, h) {
+  return w && h ? `${w}×${h}` : "—";
+}
+
+function updateUsbLive(usb) {
+  usbOverlay.classList.toggle("hidden", usb.state === "streaming");
+  usbOverlay.textContent = {
+    stopped: "USB live view stopped",
+    starting: "Starting USB live view…",
+    stale: "USB live view paused / stale",
+  }[usb.state] || usb.state;
+  if (!usb.enabled && usbStream.getAttribute("src")) {
+    usbStream.removeAttribute("src");
+  } else if (usb.enabled && !usbStream.getAttribute("src")) {
+    usbStream.src = `/usb_stream?t=${Date.now()}`;
+  }
+
+  renderDl(usbStats, [
+    ["State", `<span class="dot ${stateDot(usb.state)}"></span>${usb.state}`],
+    ["Camera frame", fmtSize(usb.source_width, usb.source_height)],
+    ["Preview", fmtSize(usb.output_width, usb.output_height)],
+    ["FPS", usb.fps.toFixed(1)],
+    ["Frames", String(usb.frames_received)],
+    ["Last frame", fmtAge(usb.last_frame_age_s)],
+    ["Error", usb.error || "—"],
   ]);
 }
 
@@ -269,6 +303,7 @@ async function refresh() {
   const status = await api("/api/status");
   updateSimBadge(status);
   updateHdmi(status.hdmi);
+  updateUsbLive(status.usb_live);
   updateCamera(status.camera);
   renderEvents(status.events || []);
   if (status.hdmi && deviceSelect.options.length) {
@@ -280,10 +315,8 @@ function wireButtons() {
   $("#btn-scan").onclick = () => refreshDevices().catch((e) => alert(e.message));
   $("#btn-hdmi-start").onclick = async () => {
     try {
-      await api("/api/hdmi/start", {
-        method: "POST",
-        body: JSON.stringify({ device: Number(deviceSelect.value || 0) }),
-      });
+      const body = deviceSelect.value ? { device: Number(deviceSelect.value) } : {};
+      await api("/api/hdmi/start", { method: "POST", body: JSON.stringify(body) });
       // Bust img cache so the multipart stream reconnects cleanly.
       $("#stream").src = `/stream?t=${Date.now()}`;
       await refresh();
@@ -303,6 +336,19 @@ function wireButtons() {
     } catch (e) {
       alert(e.message);
     }
+  };
+  $("#btn-usb-start").onclick = async () => {
+    try {
+      await api("/api/usb-live/start", { method: "POST", body: "{}" });
+      usbStream.src = `/usb_stream?t=${Date.now()}`;
+      await refresh();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+  $("#btn-usb-stop").onclick = async () => {
+    await api("/api/usb-live/stop", { method: "POST", body: "{}" });
+    await refresh();
   };
   $("#btn-cam-connect").onclick = async () => {
     try {
@@ -347,6 +393,16 @@ function wireButtons() {
   $("#btn-clear-log").onclick = () => {
     eventLog.innerHTML = "";
   };
+  document.querySelectorAll(".maximize").forEach((btn) => {
+    btn.onclick = () => {
+      const wrap = btn.closest(".stream-wrap");
+      if (document.fullscreenElement === wrap) {
+        document.exitFullscreen();
+      } else {
+        wrap.requestFullscreen().catch((e) => alert(e.message));
+      }
+    };
+  });
 }
 
 wireButtons();

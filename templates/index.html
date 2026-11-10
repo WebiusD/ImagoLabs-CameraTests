@@ -33,8 +33,30 @@
       <div class="stream-wrap">
         <img id="stream" src="/stream" alt="HDMI stream">
         <div id="stream-overlay" class="overlay">Stream stopped</div>
+        <button class="maximize" title="Maximize" aria-label="Maximize HDMI preview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+        </button>
       </div>
       <dl class="status-grid" id="hdmi-stats"></dl>
+    </section>
+
+    <section class="panel usb-panel">
+      <div class="panel-head">
+        <h2>USB live view (gphoto2)</h2>
+        <div class="row">
+          <button id="btn-usb-start" class="primary">Start</button>
+          <button id="btn-usb-stop">Stop</button>
+        </div>
+      </div>
+      <div class="stream-wrap">
+        <img id="usb-stream" alt="USB live view">
+        <div id="usb-overlay" class="overlay">USB live view stopped</div>
+        <button class="maximize" title="Maximize" aria-label="Maximize USB preview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+        </button>
+      </div>
+      <dl class="status-grid" id="usb-stats"></dl>
+      <p class="tagline">Fixed at the camera's live view size (960×640 on the R50 V). Runs alongside HDMI on Canon EOS.</p>
     </section>
 
     <section class="panel control-panel">

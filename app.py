@@ -27,8 +27,10 @@ from flask import (
 )
 
 import config
+from framing import JpegBuffer
 from gphoto_control import GphotoControl
 from hdmi_capture import HdmiCapture
+from usb_liveview import UsbLiveView
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +41,7 @@ log = logging.getLogger("cameratest")
 app = Flask(__name__)
 hdmi = HdmiCapture(device=config.HDMI_DEVICE)
 camera = GphotoControl(capture_dir=config.CAPTURE_DIR)
+usb_live = UsbLiveView(camera)
 
 # Lightweight event log shown in the UI to help interpret the test.
 _events: list[dict] = []
@@ -61,22 +64,31 @@ def index():
     return render_template("index.html")
 
 
-@app.get("/stream")
-def stream():
+def mjpeg_response(buffer: JpegBuffer) -> Response:
     def generate():
+        seq = 0
         while True:
-            frame = hdmi.get_jpeg()
+            frame, seq = buffer.wait_newer(seq)
             if frame:
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
                 )
-            time.sleep(0.03)
 
     return Response(
         generate(),
         mimetype="multipart/x-mixed-replace; boundary=frame",
     )
+
+
+@app.get("/stream")
+def stream():
+    return mjpeg_response(hdmi.buffer)
+
+
+@app.get("/usb_stream")
+def usb_stream():
+    return mjpeg_response(usb_live.buffer)
 
 
 @app.get("/captures/<path:filename>")
@@ -95,6 +107,7 @@ def api_status():
     return jsonify(
         {
             "hdmi": hdmi_status,
+            "usb_live": usb_live.status(),
             "camera": cam_status,
             "simultaneous_ok": simultaneous,
             "events": _events[-40:],
@@ -147,6 +160,27 @@ def api_hdmi_restart():
 
 
 # ---------------------------------------------------------------------------
+# USB live view (gphoto2 capture_preview)
+# ---------------------------------------------------------------------------
+@app.post("/api/usb-live/start")
+def api_usb_live_start():
+    try:
+        status = usb_live.start()
+        note("USB live view started")
+        return jsonify({"ok": True, "usb_live": status})
+    except Exception as exc:
+        note(f"USB live view start failed: {exc}", "error")
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@app.post("/api/usb-live/stop")
+def api_usb_live_stop():
+    status = usb_live.stop()
+    note("USB live view stopped")
+    return jsonify({"ok": True, "usb_live": status})
+
+
+# ---------------------------------------------------------------------------
 # gphoto2 controls
 # ---------------------------------------------------------------------------
 @app.post("/api/camera/connect")
@@ -176,6 +210,9 @@ def api_camera_connect():
 
 @app.post("/api/camera/disconnect")
 def api_camera_disconnect():
+    if usb_live.status()["enabled"]:
+        usb_live.stop()
+        note("USB live view stopped (camera disconnected)")
     status = camera.disconnect()
     note("gphoto2 disconnected")
     return jsonify({"ok": True, "camera": status, "hdmi": hdmi.status()})

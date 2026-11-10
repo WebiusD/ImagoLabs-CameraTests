@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CameraTest — HDMI + gphoto2</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>CameraTest</h1>
+      <p class="tagline">Does HDMI stay alive while gphoto2 controls the camera?</p>
+    </div>
+    <div id="sim-badge" class="badge unknown">Checking…</div>
+  </header>
+
+  <main>
+    <section class="panel stream-panel">
+      <div class="panel-head">
+        <h2>HDMI live view</h2>
+        <div class="row">
+          <label>
+            Device
+            <select id="device-select"></select>
+          </label>
+          <button id="btn-scan">Scan</button>
+          <button id="btn-hdmi-start" class="primary">Start</button>
+          <button id="btn-hdmi-stop">Stop</button>
+          <button id="btn-hdmi-restart">Restart</button>
+        </div>
+      </div>
+      <div class="stream-wrap">
+        <img id="stream" src="/stream" alt="HDMI stream">
+        <div id="stream-overlay" class="overlay">Stream stopped</div>
+      </div>
+      <dl class="status-grid" id="hdmi-stats"></dl>
+    </section>
+
+    <section class="panel control-panel">
+      <div class="panel-head">
+        <h2>gphoto2 control</h2>
+        <div class="row">
+          <button id="btn-cam-connect" class="primary">Connect USB</button>
+          <button id="btn-cam-disconnect">Disconnect</button>
+          <button id="btn-caps">Re-probe</button>
+        </div>
+      </div>
+
+      <dl class="status-grid" id="cam-stats"></dl>
+
+      <div class="checklist">
+        <h3>Suggested test order</h3>
+        <ol>
+          <li>Connect camera HDMI → capture card (USB to PC). Leave camera USB unplugged.</li>
+          <li>Start HDMI stream — confirm live image.</li>
+          <li>Plug camera USB, then <strong>Connect USB</strong> — watch whether HDMI dies.</li>
+          <li>Change exposure settings below while watching the stream.</li>
+          <li>Capture a photo — note interruption, then whether Restart recovers HDMI.</li>
+        </ol>
+      </div>
+
+      <div id="caps-section">
+        <h3>Exposure</h3>
+        <div id="exposure-controls" class="controls"></div>
+
+        <h3>Actions</h3>
+        <div id="action-controls" class="controls"></div>
+
+        <h3>Capture</h3>
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" id="auto-restart" checked>
+            Auto-restart HDMI after capture
+          </label>
+          <button id="btn-capture" class="primary danger">Capture photo</button>
+        </div>
+        <div id="last-capture" class="last-capture"></div>
+      </div>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="panel-head">
+        <h2>Event log</h2>
+        <button id="btn-clear-log" class="ghost">Clear view</button>
+      </div>
+      <ul id="event-log"></ul>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
